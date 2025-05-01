@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>مهامي - قائمة المشتريات</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>📋 قائمة المشتريات</h1>
+
+      <div id="listInfo">
+        <p>جارٍ تحميل القائمة...</p>
+      </div>
+
+      <form id="statusForm">
+        <label for="name">اسمك:</label>
+        <select id="name" required>
+          <option value="" disabled selected>اختر اسمك</option>
+          <option value="Samar">سمر</option>
+          <option value="Hosen">حسن</option>
+          <option value="Mohamed">محمد</option>
+          <option value="Abed">عابد</option>
+          <option value="Amro">عمرو</option>
+        </select>
+
+        <label for="password">كلمة المرور:</label>
+        <input type="password" id="password" required />
+
+        <div class="btn-group">
+          <button type="button" id="receiveBtn">تم الاستلام</button>
+          <button type="button" id="doneBtn">تم الانتهاء</button>
+        </div>
+      </form>
+
+      <p id="message" style="margin-top: 10px"></p>
+    </div>
+
+    <script>
+      let currentListId = null;
+
+      async function loadLatestList() {
+        const res = await fetch("/latest");
+        const data = await res.json();
+        const listDiv = document.getElementById("listInfo");
+
+        if (!data || !data.items) {
+          listDiv.innerHTML = "<p>لا توجد قائمة مشتريات حالياً.</p>";
+          return;
+        }
+
+        currentListId = data.id;
+        let html = `
+        <p><strong>📤 المرسِل:</strong> ${data.sender}</p>
+        <p><strong>🕒 وقت الإرسال:</strong> ${new Date(
+          data.sent_time
+        ).toLocaleString()}</p>
+        <p><strong>📄 العناصر:</strong></p>
+        <ul>
+          ${data.items
+            .split(",")
+            .map((item) => `<li>${item.trim()}</li>`)
+            .join("")}
+        </ul>
+      `;
+
+        if (data.received_by) {
+          html += `<p><strong>📥 تم الاستلام من:</strong> ${
+            data.received_by
+          } في ${new Date(data.received_time).toLocaleString()}</p>`;
+        }
+
+        if (data.done_by) {
+          html += `<p><strong>✅ تم الانتهاء من قبل:</strong> ${
+            data.done_by
+          } في ${new Date(data.done_time).toLocaleString()}</p>`;
+        }
+
+        listDiv.innerHTML = html;
+      }
+
+      async function handleStatus(action) {
+        const name = document.getElementById("name").value;
+        const password = document.getElementById("password").value;
+        const msg = document.getElementById("message");
+
+        if (!name || !password) {
+          msg.textContent = "❌ يرجى إدخال الاسم وكلمة المرور.";
+          msg.style.color = "red";
+          return;
+        }
+
+        const endpoint = action === "receive" ? "/receive" : "/done";
+
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, password, listId: currentListId }),
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          msg.style.color = "green";
+          msg.textContent = `✅ ${result.message}`;
+          loadLatestList();
+        } else {
+          const err = await res.json();
+          msg.style.color = "red";
+          msg.textContent = `❌ ${err.error || "حدث خطأ"}`;
+        }
+      }
+
+      document.getElementById("receiveBtn").addEventListener("click", () => {
+        handleStatus("receive");
+      });
+
+      document.getElementById("doneBtn").addEventListener("click", () => {
+        handleStatus("done");
+      });
+
+      loadLatestList();
+    </script>
+  </body>
+</html>
